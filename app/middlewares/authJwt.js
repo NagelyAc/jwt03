@@ -17,7 +17,7 @@ export const verifyToken = async (req, res, next) => {
 
     req.userId = decoded.id;
 
-    const user = await User.findByPk(req.userId);
+    const user = await User.findById(req.userId);
 
     if (!user) {
       return res.status(401).json({ message: "No autorizado!" });
@@ -31,12 +31,9 @@ export const verifyToken = async (req, res, next) => {
 
 export const isAdmin = async (req, res, next) => {
   try {
-    const user = await User.findByPk(req.userId);
-    const roles = await user.getRoles();
+    const user = await User.findById(req.userId);
 
-    const adminRole = roles.find((role) => role.name === "admin");
-
-    if (adminRole) {
+    if (user?.roles.includes("admin")) {
       next();
       return;
     }
@@ -49,12 +46,9 @@ export const isAdmin = async (req, res, next) => {
 
 export const isModerator = async (req, res, next) => {
   try {
-    const user = await User.findByPk(req.userId);
-    const roles = await user.getRoles();
+    const user = await User.findById(req.userId);
 
-    const modRole = roles.find((role) => role.name === "moderator");
-
-    if (modRole) {
+    if (user?.roles.includes("moderator")) {
       next();
       return;
     }
@@ -67,10 +61,8 @@ export const isModerator = async (req, res, next) => {
 
 export const isModeratorOrAdmin = async (req, res, next) => {
   try {
-    const user = await User.findByPk(req.userId);
-    const roles = await user.getRoles();
-
-    const hasRole = roles.some((role) => ["admin", "moderator"].includes(role.name));
+    const user = await User.findById(req.userId);
+    const hasRole = user?.roles.some((role) => ["admin", "moderator"].includes(role));
 
     if (hasRole) {
       next();

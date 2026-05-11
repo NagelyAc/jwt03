@@ -1,17 +1,33 @@
-export default (sequelize, Sequelize) => {
-  const User = sequelize.define("users", {
+import mongoose from "mongoose";
+
+const userSchema = new mongoose.Schema(
+  {
     username: {
-      type: Sequelize.STRING,
+      type: String,
+      required: true,
       unique: true,
+      trim: true,
     },
     email: {
-      type: Sequelize.STRING,
+      type: String,
+      required: true,
       unique: true,
+      trim: true,
+      lowercase: true,
     },
     password: {
-      type: Sequelize.STRING,
+      type: String,
+      required: true,
     },
-  });
+    roles: {
+      type: [String],
+      enum: ["user", "admin", "moderator"],
+      default: ["user"],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-  return User;
-};
+export default mongoose.model("User", userSchema);

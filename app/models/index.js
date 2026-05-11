@@ -1,50 +1,23 @@
-import Sequelize from "sequelize";
+import mongoose from "mongoose";
 
-import dbConfig from "../config/db.config.js";
+import User from "./user.model.js";
+import RefreshToken from "./refreshToken.model.js";
 
-import userModel from "./user.model.js";
-import roleModel from "./role.model.js";
-import refreshTokenModel from "./refreshToken.model.js";
+const db = {
+  mongoose,
+  user: User,
+  refreshToken: RefreshToken,
+  ROLES: ["user", "admin", "moderator"],
+};
 
-const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
-  host: dbConfig.HOST,
-  dialect: dbConfig.dialect,
-  pool: dbConfig.pool,
-  port: dbConfig.PORT,
-});
+export const connectDB = async () => {
+  const mongoUri = process.env.MONGODB_URI;
 
-const db = {};
+  if (!mongoUri) {
+    throw new Error("MONGODB_URI is not configured.");
+  }
 
-db.Sequelize = Sequelize;
-db.sequelize = sequelize;
-
-db.user = userModel(sequelize, Sequelize);
-db.role = roleModel(sequelize, Sequelize);
-db.refreshToken = refreshTokenModel(sequelize, Sequelize);
-
-db.role.belongsToMany(db.user, {
-  through: "user_roles",
-  foreignKey: "roleId",
-  otherKey: "userId",
-});
-
-db.user.belongsToMany(db.role, {
-  through: "user_roles",
-  foreignKey: "userId",
-  otherKey: "roleId",
-  as: "roles",
-});
-
-db.refreshToken.belongsTo(db.user, {
-  foreignKey: "userId",
-  targetKey: "id",
-});
-
-db.user.hasMany(db.refreshToken, {
-  foreignKey: "userId",
-  targetKey: "id",
-});
-
-db.ROLES = ["user", "admin", "moderator"];
+  await mongoose.connect(mongoUri);
+};
 
 export default db;

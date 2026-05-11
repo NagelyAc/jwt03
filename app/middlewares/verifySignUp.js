@@ -4,17 +4,13 @@ const { ROLES, user: User } = db;
 
 export const checkDuplicateUsernameOrEmail = async (req, res, next) => {
   try {
-    const userByUsername = await User.findOne({
-      where: { username: req.body.username },
-    });
+    const userByUsername = await User.findOne({ username: req.body.username });
 
     if (userByUsername) {
       return res.status(400).json({ message: "El nombre de usuario ya esta en uso!" });
     }
 
-    const userByEmail = await User.findOne({
-      where: { email: req.body.email },
-    });
+    const userByEmail = await User.findOne({ email: req.body.email });
 
     if (userByEmail) {
       return res.status(400).json({ message: "El correo electronico ya esta en uso!" });

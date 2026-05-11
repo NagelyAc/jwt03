@@ -1,35 +1,46 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 
-export default (sequelize, Sequelize) => {
-  const RefreshToken = sequelize.define("refresh_tokens", {
+const refreshTokenSchema = new mongoose.Schema(
+  {
     token: {
-      type: Sequelize.STRING,
-      allowNull: false,
+      type: String,
+      required: true,
       unique: true,
     },
-    expiryDate: {
-      type: Sequelize.DATE,
-      allowNull: false,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
+    expiryDate: {
+      type: Date,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+refreshTokenSchema.statics.createToken = async function createToken(user) {
+  const expiredAt = new Date();
+
+  expiredAt.setSeconds(
+    expiredAt.getSeconds() + Number(process.env.JWT_REFRESH_EXPIRATION || 86400)
+  );
+
+  const refreshToken = await this.create({
+    token: crypto.randomUUID(),
+    userId: user._id,
+    expiryDate: expiredAt,
   });
 
-  RefreshToken.createToken = async (user) => {
-    const expiredAt = new Date();
-
-    expiredAt.setSeconds(expiredAt.getSeconds() + Number(process.env.JWT_REFRESH_EXPIRATION || 86400));
-
-    const refreshToken = await RefreshToken.create({
-      token: crypto.randomUUID(),
-      userId: user.id,
-      expiryDate: expiredAt,
-    });
-
-    return refreshToken.token;
-  };
-
-  RefreshToken.verifyExpiration = (token) => {
-    return token.expiryDate.getTime() < new Date().getTime();
-  };
-
-  return RefreshToken;
+  return refreshToken.token;
 };
+
+refreshTokenSchema.statics.verifyExpiration = function verifyExpiration(token) {
+  return token.expiryDate.getTime() < new Date().getTime();
+};
+
+export default mongoose.model("RefreshToken", refreshTokenSchema);

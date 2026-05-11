@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import authConfig from "../config/auth.config.js";
 
-const { user: User, role: Role, refreshToken: RefreshToken } = db;
+const { user: User, refreshToken: RefreshToken, ROLES } = db;
 
 const buildAccessToken = (userId) => {
   return jwt.sign({ id: userId }, authConfig.secret, {
@@ -16,25 +16,16 @@ export const signup = async (req, res) => {
     const { username, email, password, roles } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 8);
+    const normalizedRoles = roles?.length
+      ? roles.filter((role) => ROLES.includes(role))
+      : ["user"];
 
-    const user = await User.create({
+    await User.create({
       username,
       email,
       password: hashedPassword,
+      roles: normalizedRoles,
     });
-
-    if (roles?.length) {
-      const foundRoles = await Role.findAll({
-        where: {
-          name: roles,
-        },
-      });
-
-      await user.setRoles(foundRoles);
-    } else {
-      const userRole = await Role.findOne({ where: { name: "user" } });
-      await user.setRoles([userRole]);
-    }
 
     res.status(201).json({ message: "User registered successfully!" });
   } catch (error) {
@@ -46,10 +37,7 @@ export const signin = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const user = await User.findOne({
-      where: { username },
-      include: [{ model: Role, as: "roles" }],
-    });
+    const user = await User.findOne({ username });
 
     if (!user) {
       return res.status(404).json({ message: "User Not found." });
@@ -64,15 +52,15 @@ export const signin = async (req, res) => {
       });
     }
 
-    await RefreshToken.destroy({ where: { userId: user.id } });
+    await RefreshToken.deleteMany({ userId: user._id });
 
-    const accessToken = buildAccessToken(user.id);
+    const accessToken = buildAccessToken(user._id.toString());
     const refreshToken = await RefreshToken.createToken(user);
 
-    const authorities = user.roles.map((role) => `ROLE_${role.name.toUpperCase()}`);
+    const authorities = user.roles.map((role) => `ROLE_${role.toUpperCase()}`);
 
     res.status(200).json({
-      id: user.id,
+      id: user._id,
       username: user.username,
       email: user.email,
       roles: authorities,
@@ -92,35 +80,33 @@ export const refreshToken = async (req, res) => {
   }
 
   try {
-    const token = await RefreshToken.findOne({ where: { token: requestToken } });
+    const token = await RefreshToken.findOne({ token: requestToken });
 
     if (!token) {
       return res.status(403).json({ message: "Refresh token is not in database!" });
     }
 
     if (RefreshToken.verifyExpiration(token)) {
-      await RefreshToken.destroy({ where: { id: token.id } });
+      await RefreshToken.deleteOne({ _id: token._id });
 
       return res.status(403).json({
         message: "Refresh token expired. Please sign in again.",
       });
     }
 
-    const user = await User.findByPk(token.userId, {
-      include: [{ model: Role, as: "roles" }],
-    });
+    const user = await User.findById(token.userId);
 
     if (!user) {
-      await RefreshToken.destroy({ where: { id: token.id } });
+      await RefreshToken.deleteOne({ _id: token._id });
 
       return res.status(404).json({ message: "User not found." });
     }
 
-    const newAccessToken = buildAccessToken(token.userId);
-    const authorities = user.roles.map((role) => `ROLE_${role.name.toUpperCase()}`);
+    const newAccessToken = buildAccessToken(token.userId.toString());
+    const authorities = user.roles.map((role) => `ROLE_${role.toUpperCase()}`);
 
     return res.status(200).json({
-      id: user.id,
+      id: user._id,
       username: user.username,
       email: user.email,
       roles: authorities,
@@ -140,7 +126,7 @@ export const signout = async (req, res) => {
   }
 
   try {
-    await RefreshToken.destroy({ where: { token: refreshToken } });
+    await RefreshToken.deleteOne({ token: refreshToken });
 
     res.status(200).json({ message: "Signed out successfully!" });
   } catch (error) {
